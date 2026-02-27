@@ -53,20 +53,17 @@ let rec reduceAllCBN term =
 // The argument first reduces to 'z' and then the whole term reduces to 'z'.
 // (In call-by-name, the term first reduces to '((\y.y) z)' and then to 'z'.)
 
+// TASK #1: Implement call-by-value reduction
 let rec reduceCBV (term:Term) : option<Term> = 
-  match term with 
-  | Application(Lambda(v, t1), t2) -> 
-      match reduceCBV t2 with 
-      | Some t2' -> Some(Application(Lambda(v, t1), t2'))
-      | _ -> Some(substitute v t2 t1)
-  | Application(t1, t2) -> 
-      match reduceCBV t1 with 
-      | Some t1' -> Some(Application(t1', t2))
-      | _ ->
-          match reduceCBV t2 with 
-          | Some t2' -> Some(Application(t1, t2'))
-          | _ -> None
-  | Lambda _ | Variable _ -> None    
+  failwith "TODO"
+  // * If the term is 'Application(Lambda(v, t1), t2)' then
+  //   first try reducing the argument 't2' recursively
+  //   - If this succeeds, return the reduced Application(Lambda(v, t1), t2reduced)
+  //   - If this does not succeed, t2 is a value and we can do substitution
+  // * If the term is 'Application(t1, t2)', try reducing 
+  //   't1' and then 't2' recursively (in the same way as in CBN)
+  // * If the term is anything else then it cannot be reduced
+
 
 // TASK #2: Run implement recursive reduction 
 // (this is the same as reduceAllCBN)
