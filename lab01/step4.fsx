@@ -76,10 +76,9 @@ format (normalize (num 2)) = "(s (s z))"
 // TASK #1: Can you implement the 'successor' function? See the definition:
 // https://en.wikipedia.org/wiki/Church_encoding#Calculation_with_Church_numerals
 
-let succ = 
-  Lambda("n", Lambda("f", Lambda("x", 
-    Application(Variable "f",
-      Application(Application(Variable "n", Variable "f"), Variable "x")))))
+let succ = failwith "TODO"
+
+
 
 // TEST: The successor of the successor of 0 should be 2!
 
