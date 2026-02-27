@@ -65,7 +65,6 @@ let rec allAccessedVariables t =
   match t with 
   | Variable(v) -> v
   // TODO: Implement the cases for Lambda and Application!
-  | Lambda(_, b) -> allAccessedVariables b
 
 
 allAccessedVariables t1 = "x"
@@ -75,7 +74,7 @@ allAccessedVariables t3 = "x,y"
 let txyz = Application(Application(Variable("x"), Variable("y")), Variable("z"))
 let txxx = Application(Application(Variable("x"), Variable("x")), Variable("x"))
 allAccessedVariables txyz = "x,y,z"
-allAccessedVariables txyz = "x,x,x"
+allAccessedVariables txxx = "x,x,x"
 
 // ============================================================================
 // Pretty printing lambda terms

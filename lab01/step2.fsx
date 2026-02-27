@@ -43,9 +43,7 @@ let rec substitute (var:string) (subst:Term) (term:Term) : Term =
 // of a lambda) - if so, it returns 'Some' with the reduction result; if 
 // the term is anything else, it returns 'None'
 let reduceRedexCBN (term:Term) : option<Term> = 
-  match term with 
-  | Application(Lambda(v, t1), t2) -> Some(substitute v t2 t1)
-  | _ -> None
+  failwith "TODO"
 
 
 // TEST - this reduces: (\x.x) z ~> z
