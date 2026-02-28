@@ -24,18 +24,42 @@ let tryFormat optTerm =
   | None -> ""
   
 let rec substitute (var:string) (subst:Term) (term:Term) : Term = 
-  failwith "TODO - copy your code from step 1"
+  //failwith "TODO - copy your code from step 1"
+  match term with
+  | Variable(v) -> if v = var then subst else term
+  | Lambda(x, body) -> 
+      if x = var then term else Lambda(x, substitute var subst body)
+  | Application(t1, t2) -> Application(substitute var subst t1, substitute var subst t2)
+
 
 // ============================================================================
 // Call-by-name reduction
 // ============================================================================
 
 let reduceRedexCBN (term:Term) : option<Term> = 
-  failwith "TODO - copy your code from step 2"
+  //failwith "TODO - copy your code from step 2"
+  match term with
+  | Application(Lambda(x, t1), t2) -> Some (substitute x t2 t1)
+  | _ -> None
 
 let rec reduceCBN (term:Term) : option<Term> = 
-  failwith "TODO - copy your code from step 2"
+  //failwith "TODO - copy your code from step 2"
+  match reduceRedexCBN term with 
+  | Some reduced -> Some reduced
+  | None ->
+      match term with
+      | Variable _ -> None
+      | Lambda _ -> None
+      | Application(t1, t2) -> 
+          match reduceCBN t1 with
+          | Some t1reduced -> Some(Application(t1reduced, t2))
+          | None -> 
+              match reduceCBN t2 with
+              | Some t2reduced -> Some(Application(t1, t2reduced))
+              | None -> None
 
+// DEMO: A helper function that runs 'reduceCBN' recursively
+// as long as it can find and reduce some redex in the term 
 let rec reduceAllCBN term = 
   match reduceCBN term with 
   | Some term -> reduceAllCBN term
@@ -55,7 +79,7 @@ let rec reduceAllCBN term =
 
 // TASK #1: Implement call-by-value reduction
 let rec reduceCBV (term:Term) : option<Term> = 
-  failwith "TODO"
+  // failwith "TODO"
   // * If the term is 'Application(Lambda(v, t1), t2)' then
   //   first try reducing the argument 't2' recursively
   //   - If this succeeds, return the reduced Application(Lambda(v, t1), t2reduced)
@@ -63,13 +87,28 @@ let rec reduceCBV (term:Term) : option<Term> =
   // * If the term is 'Application(t1, t2)', try reducing 
   //   't1' and then 't2' recursively (in the same way as in CBN)
   // * If the term is anything else then it cannot be reduced
+  match term with
+  | Application(Lambda(v, t1), t2) -> 
+      match reduceCBV t2 with
+      | Some t2reduced -> Some(Application(Lambda(v, t1), t2reduced))
+      | None -> Some(substitute v t2 t1)
+  | Application(t1, t2) ->
+      match reduceCBV t1 with
+      | Some t1reduced -> Some(Application(t1reduced, t2))
+      | None -> 
+          match reduceCBV t2 with
+          | Some t2reduced -> Some(Application(t1, t2reduced))
+          | None -> None
+  | _ -> None
 
 
 // TASK #2: Run implement recursive reduction 
 // (this is the same as reduceAllCBN)
 
 let rec reduceAllCBV term = 
-  failwith "TODO"
+  match reduceCBV term with 
+  | Some term -> reduceAllCBV term
+  | None -> term
 
 
 // TESTS: The following are copied from step2. The 

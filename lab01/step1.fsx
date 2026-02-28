@@ -36,8 +36,10 @@ let t3 = Application(Lambda("x", Variable("x")), Variable("y"))
 
 let getTopLevelStructure t =
   match t with
-  | Variable(v) -> $"variable: {v}" 
+  | Variable(v) -> $"variable: {v}"
   // TODO: Add cases for Lambda and Application
+  | Lambda(x, _) -> $"lambda: {x}"
+  | Application(_, _) -> "application"
 
 getTopLevelStructure t1 = "variable: x"
 getTopLevelStructure t2 = "lambda: x"
@@ -65,6 +67,8 @@ let rec allAccessedVariables t =
   match t with 
   | Variable(v) -> v
   // TODO: Implement the cases for Lambda and Application!
+  | Lambda(x, body) -> allAccessedVariables body
+  | Application(t1, t2) -> allAccessedVariables t1 + "," + allAccessedVariables t2
 
 
 allAccessedVariables t1 = "x"
@@ -114,7 +118,7 @@ format t3 = "((\\x.x) y)"
 // annotations to tell the F# compiler what types to expect. This means 
 // you'll get better error messages!
 let rec substitute (var:string) (subst:Term) (term:Term) : Term = 
-  failwith "TODO"
+  //failwith "TODO"
   // * If the term is 'Variable' then you need 'if' to decide between two cases:
   //   - the variable is 'var' - return the substitution
   //   - the variable is something else - return it unmodified
@@ -122,7 +126,11 @@ let rec substitute (var:string) (subst:Term) (term:Term) : Term =
   //   - the lambda defines variable that is the same as 'var' - return it unmodified
   //   - the lambda defines some other variable - do substitution in the body
   // * If the term is 'Application', call substitution recursively on both terms
-  
+  match term with
+  | Variable(v) -> if v = var then subst else term
+  | Lambda(x, body) -> 
+      if x = var then term else Lambda(x, substitute var subst body)
+  | Application(t1, t2) -> Application(substitute var subst t1, substitute var subst t2)
 
 
 // TEST: The term is just a variable and it gets substituted 
@@ -162,12 +170,16 @@ let sm = su - set [ 1; 3; 5 ] // Remove elements from the set
 
 
 let rec freeVariables (term:Term) : Set<string> = 
-  failwith "TODO"
+  //failwith "TODO"
   // * If the term is 'Variable' the variable is free - return it as a singleton set
   // * If the term is 'Application', get the free variables of the two subtersm and
   //   return a union of the two sets using +
   // * If the term is 'Lambda', get the free variables of the body - this may include
   //   the variable defined by the lambda, so we need to remove this using '-'!
+  match term with
+  | Variable(v) -> set [v]
+  | Application(t1, t2) -> freeVariables t1 + freeVariables t2
+  | Lambda(x, body) -> freeVariables body - set [x]
 
 
 let tf1 = Application(Variable("x"), Variable("y"))

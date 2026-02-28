@@ -26,7 +26,12 @@ let tryFormat optTerm =
   | None -> ""
   
 let rec substitute (var:string) (subst:Term) (term:Term) : Term = 
-  failwith "TODO - copy your code from step 1"
+  //failwith "TODO - copy your code from step 1"
+  match term with
+  | Variable(v) -> if v = var then subst else term
+  | Lambda(x, body) -> 
+      if x = var then term else Lambda(x, substitute var subst body)
+  | Application(t1, t2) -> Application(substitute var subst t1, substitute var subst t2)
 
 // ============================================================================
 // Call-by-name reduction
@@ -43,7 +48,10 @@ let rec substitute (var:string) (subst:Term) (term:Term) : Term =
 // of a lambda) - if so, it returns 'Some' with the reduction result; if 
 // the term is anything else, it returns 'None'
 let reduceRedexCBN (term:Term) : option<Term> = 
-  failwith "TODO"
+  //failwith "TODO"
+  match term with
+  | Application(Lambda(x, t1), t2) -> Some (substitute x t2 t1)
+  | _ -> None
 
 
 // TEST - this reduces: (\x.x) z ~> z
@@ -76,7 +84,7 @@ let rec reduceCBN (term:Term) : option<Term> =
   match reduceRedexCBN term with 
   | Some reduced -> Some reduced
   | None -> 
-      failwith "TODO"
+      //failwith "TODO"
       // If the term is 'Variable' or 'Lambda' then we cannot do anything and just return 'None'
       // If the term is 'Application(t1, t2)' then we try to apply 'reduce' to 
       // the two sub-terms - t1 and t2. 
@@ -85,6 +93,17 @@ let rec reduceCBN (term:Term) : option<Term> =
       //   - if this is 'Some(t1reduced)' then return 'Some(Application(t1reduced, t2))'
       // * Otherwise, if 'reduce t1' returns None (term t1 cannot be reduced) try reducing t2:
       //   - if this is 'Some(t2reduced)' then return 'Some(Application(t1, t2reduced))'
+      // * If neither t1 nor t2 can be reduced, return None
+      match term with
+      | Variable _ -> None
+      | Lambda _ -> None
+      | Application(t1, t2) -> 
+          match reduceCBN t1 with
+          | Some t1reduced -> Some(Application(t1reduced, t2))
+          | None -> 
+              match reduceCBN t2 with
+              | Some t2reduced -> Some(Application(t1, t2reduced))
+              | None -> None
 
 
 let tcbn1 = 
