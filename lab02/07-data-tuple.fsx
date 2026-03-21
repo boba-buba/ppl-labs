@@ -36,24 +36,83 @@ and VariableContext =
 
 let rec evaluate (ctx:VariableContext) e =
   match e with 
-  | Constant _ -> failwith "implemented in step 1"
-  | Binary _ -> failwith "implemented in step 1"
-  | Variable _ -> failwith "implemented in step 1"
-  | Unary _ -> failwith "implemented in step 2"
-  | If _ -> failwith "implemented in step 2"
-  | Log _ -> failwith "implemented in step 3"
-  | Let _ -> failwith "implemented in step 3"
-  | Lambda _ -> failwith "implemented in step 6"
-  | Application _ -> failwith "implemented in step 6"
+  | Constant n -> ValNum n
+  | Binary(op, e1, e2) ->
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      match v1, v2 with 
+      | ValNum n1, ValNum n2 -> 
+          match op with 
+          | "+" -> ValNum(n1 + n2)
+          | "*" -> ValNum(n1 * n2)
+          | _ -> failwith "unsupported binary operator"
+  | Variable(v) ->
+      match ctx.TryFind v with 
+      | Some res -> res
+      | _ -> failwith ("unbound variable: " + v)
+  | Unary(op, e) ->
+      // TODO: Implement the case for 'Unary' here!
+      let v = evaluate ctx e
+      match v with 
+      | ValNum n -> 
+          match op with 
+          | "-" -> ValNum(-n)
+          | _ -> failwith "unsupported unary operator"
+      | _ -> failwith "unary operator applied to non-numeric value"
+  | If(cond, thenExpr, elseExpr) ->
+      // TODO: Implement the case for 'If' here!
+      let vCond = evaluate ctx cond
+      match vCond with
+      | ValNum n when n <> 0 -> evaluate ctx thenExpr
+      | ValNum 0 -> evaluate ctx elseExpr
+      | _ -> failwith "condition evaluated to non-numeric value"
+  | Log(msg, e) -> 
+      // TODO: Evaluate the expression 'e', print the result using 
+      // printf "%s: %A" (%s for string argument, %A for any argument)
+      // and return the evaluated result.
+      // failwith "todo"
+      let v = evaluate ctx e
+      printf "%s: %A\n" msg v
+      v
+
+  | Let(v, earg, ebody) ->
+      // TODO: Evaluate the argument, add it to the current 'ctx' to get
+      // a new context and then evalaute body with the new context.
+      // failwith "todo"      
+      let vArg = evaluate ctx earg
+      let newCtx = ctx.Add(v, vArg)
+      evaluate newCtx ebody
+
+  | Lambda(v, e) ->
+      // TODO: Now capture the variable context when creating a closure!
+      ValClosure(v, e, ctx)
+
+  | Application(e1, e2) ->
+      // TODO: The body of the closure needs to be evaluated with a context
+      // that adds the variable to the captured evaluation context
+      // failwith "not implemented"
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      match v1 with
+      | ValClosure(param, body, capturedCtx) ->
+          let newCtx = capturedCtx.Add(param, v2)
+          evaluate newCtx body
+      | _ -> failwith "application of non-function"
 
   | Tuple(e1, e2) ->
       // TODO: Construct a tuple value here!
-      failwith "not implemented"
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      ValTuple(v1, v2)
 
   | TupleGet(b, e) ->
       // TODO: Access #1 or #2 element of a tuple value.
       // (If the argument is not a tuple, this fails.)
-      failwith "not implemented"
+      let v = evaluate ctx e
+      match v with
+      | ValTuple(x, y) when b -> x
+      | ValTuple(x, y) when not b -> y
+      | _ -> failwith "not a tuple value"
 
 // ----------------------------------------------------------------------------
 // Test cases

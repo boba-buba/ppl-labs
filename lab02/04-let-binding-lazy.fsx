@@ -25,20 +25,53 @@ type VariableContext =
 
 let rec evaluate (ctx:VariableContext) e =
   match e with 
-  | Constant _ -> failwith "implemented in step 1"
-  | Binary _ -> failwith "implemented in step 1"
-  | Unary _ -> failwith "implemented in step 2"
-  | If _ -> failwith "implemented in step 2"  
-  | Log _ -> failwith "implemented in step 3"
-
-  | Variable _ -> 
+  | Constant n -> ValNum n
+  | Binary(op, e1, e2) ->
+      let v1 = evaluate ctx e1
+      let v2 = evaluate ctx e2
+      match v1, v2 with 
+      | ValNum n1, ValNum n2 -> 
+          match op with 
+          | "+" -> ValNum(n1 + n2)
+          | "*" -> ValNum(n1 * n2)
+          | _ -> failwith "unsupported binary operator"
+  | Unary(op, e) ->
+      // TODO: Implement the case for 'Unary' here!
+      let v = evaluate ctx e
+      match v with 
+      | ValNum n -> 
+          match op with 
+          | "-" -> ValNum(-n)
+          | _ -> failwith "unsupported unary operator"
+      | _ -> failwith "unary operator applied to non-numeric value"
+  | If(cond, thenExpr, elseExpr) ->
+      // TODO: Implement the case for 'If' here!
+      let vCond = evaluate ctx cond
+      match vCond with
+      | ValNum n when n <> 0 -> evaluate ctx thenExpr
+      | ValNum 0 -> evaluate ctx elseExpr
+      | _ -> failwith "condition evaluated to non-numeric value"
+  | Log(msg, e) -> 
+      // TODO: Evaluate the expression 'e', print the result using 
+      // printf "%s: %A" (%s for string argument, %A for any argument)
+      // and return the evaluated result.
+      // failwith "todo"
+      let v = evaluate ctx e
+      printf "%s: %A\n" msg v
+      v
+  | Variable(v) -> 
       // TODO: Context now contains unevaluated expressions and so
       // you need to evaluate them when variable is accessed!
-      failwith "todo"
+      // failwith "todo"
+      match ctx.TryFind v with 
+      | Some res -> evaluate ctx res
+      | _ -> failwith ("unbound variable: " + v)
 
   | Let(v, earg, ebody) ->
       // TODO: Now we need to store the unevaluated 'earg'!
-      failwith "todo"      
+      // failwith "todo"      
+      let newCtx = ctx.Add(v, earg)
+      evaluate newCtx ebody
 
 // ----------------------------------------------------------------------------
 // Test cases
