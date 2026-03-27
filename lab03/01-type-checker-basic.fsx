@@ -29,30 +29,58 @@ let rec typeCheck (ctx:TypingContext) expr =
   match expr with
   | StringConst _ ->
       // TODO: Return the type of a string constant.
-      failwith "not implemented"
+      // failwith "not implemented"
+      String
 
   | NumberConst _ ->
       // TODO: Return the type of a number constant.
-      failwith "not implemented"
+      // failwith "not implemented"
+      Number
 
   | Binary(op, l, r) ->
       // TODO: Type-check binary expressions. The supported operators are
       // "*", "/", "+", "-". Both arguments must be Number and the result is
       // Number. Fail with an error for unknown operators or for non-number
       // arguments. (Hint: use set ["*"; "/"; "+"; "-"] to define the set.)
-      failwith "not implemented"
+      // failwith "not implemented"
+      let supportedOps = set ["*"; "/"; "+"; "-"]
+      if not (supportedOps.Contains op) then
+        failwith $"Unknown operator: {op}"
+      else
+        let leftType = typeCheck ctx l
+        let rightType = typeCheck ctx r
+        if leftType <> Number then
+          failwith $"Left argument of '{op}' must be a Number, but got {leftType}"
+        elif rightType <> Number then
+          failwith $"Right argument of '{op}' must be a Number, but got {rightType}"
+        else
+          Number
 
   | Variable v ->
       // TODO: Look up the variable type in the context using ctx.ContainsKey
       // and ctx[v]. If the variable is not in the context, fail with an error.
-      failwith "not implemented"
+      // failwith "not implemented"
+      if ctx.ContainsKey v then
+        ctx.[v]
+      else
+        failwith $"Variable '{v}' is unbound"
 
   | If(e1, e2, e3) ->
       // TODO: Type-check the condition 'e1' and both branches 'e2', 'e3'.
       // * The condition must be Number
       // * Both branches must have the same type
       // * The overall type is the type of the branches
-      failwith "not implemented"
+      // failwith "not implemented"
+      let conditionType = typeCheck ctx e1
+      if conditionType <> Number then
+        failwith $"Condition of 'if' must be a Number, but got {conditionType}"
+      else
+        let branch1Type = typeCheck ctx e2
+        let branch2Type = typeCheck ctx e3
+        if branch1Type <> branch2Type then
+          failwith $"Branches of 'if' must have the same type, but got {branch1Type} and {branch2Type}"
+        else
+          branch1Type
 
 // ----------------------------------------------------------------------------
 // Test cases

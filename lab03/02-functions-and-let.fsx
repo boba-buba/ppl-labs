@@ -30,26 +30,70 @@ type TypingContext = Map<string, Type>
 
 let rec typeCheck (ctx:TypingContext) expr =
   match expr with
-  | StringConst _ -> failwith "implemented in step 1"
-  | NumberConst _ -> failwith "implemented in step 1"
-  | Binary _ -> failwith "implemented in step 1"
-  | Variable _ -> failwith "implemented in step 1"
-  | If _ -> failwith "implemented in step 1"
+  | StringConst _ ->
+      String
+
+  | NumberConst _ ->
+      Number
+
+  | Binary(op, l, r) ->
+      let supportedOps = set ["*"; "/"; "+"; "-"]
+      if not (supportedOps.Contains op) then
+        failwith $"Unknown operator: {op}"
+      else
+        let leftType = typeCheck ctx l
+        let rightType = typeCheck ctx r
+        if leftType <> Number then
+          failwith $"Left argument of '{op}' must be a Number, but got {leftType}"
+        elif rightType <> Number then
+          failwith $"Right argument of '{op}' must be a Number, but got {rightType}"
+        else
+          Number
+
+  | Variable v ->
+      if ctx.ContainsKey v then
+        ctx.[v]
+      else
+        failwith $"Variable '{v}' is unbound"
+
+  | If(e1, e2, e3) ->
+      let conditionType = typeCheck ctx e1
+      if conditionType <> Number then
+        failwith $"Condition of 'if' must be a Number, but got {conditionType}"
+      else
+        let branch1Type = typeCheck ctx e2
+        let branch2Type = typeCheck ctx e3
+        if branch1Type <> branch2Type then
+          failwith $"Branches of 'if' must have the same type, but got {branch1Type} and {branch2Type}"
+        else
+          branch1Type
 
   | Lambda(v, t, e) ->
       // TODO: Type-check the lambda body 'e' in a context extended with
       // variable 'v' having the annotated type 't'. Note that this is
       // why we had to add type to 'Lambda'!
-      failwith "not implemented"
+      // failwith "not implemented"
+      let newCtx = Map.add v t ctx
+      let bodyType = typeCheck newCtx e
+      Function(t, bodyType)
 
   | Application(e1, e2) ->
       // TODO: Type-check e1 and e2. e1 must have a Function(t1, t2) type -
       // its argument type must match the type of e2 and the result is t2.
-      failwith "not implemented"
+      // failwith "not implemented"
+      let funcType = typeCheck ctx e1
+      let argType = typeCheck ctx e2
+      match funcType with
+      | Function(t1, t2) when t1 = argType -> t2
+      | Function(t1, t2) -> failwith $"Argument type mismatch: expected {t1}, got {argType}"
+      | _ -> failwith $"Expected a function, but got {funcType}"
 
   | Let(v, e1, e2) ->
       // TODO: Type check 'let v = e1 in e2' 
-      failwith "not implemented"
+      // failwith "not implemented"
+      let bindingType = typeCheck ctx e1
+      let newCtx = Map.add v bindingType ctx
+      typeCheck newCtx e2
 
 // ----------------------------------------------------------------------------
 // Test cases

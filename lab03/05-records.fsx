@@ -85,10 +85,36 @@ let rec unify constraints : option<Map<_, _>> =
       // and call unify on the combined list.
       //
       // (Hint: use List.ofSeq r1.Keys to iterate over the keys of r1.)
-      failwith "not implemented"
+      //failwith "not implemented"
+      let r1Keys = set r1.Keys
+      let r2Keys = set r2.Keys
+      if not (Set.isSubset r1Keys r2Keys) then
+        None
+      else
+        let fieldConstraints =
+          List.map (fun k -> (r1[k], r2[k])) (List.ofSeq r1.Keys)
+        unify (fieldConstraints @ constraints)
 
   // TODO: Copy your implementation from the previous step
-  | _ -> failwith "implemented in step 4" 
+  | (Number, Number)::constraints -> unify constraints
+
+  | (String, String)::constraints -> unify constraints
+
+  | (Function(ta1, ta2), Function(tb1, tb2))::constraints ->
+      unify ([(ta1, tb1); (ta2, tb2)] @ constraints)
+  | (Tuple(ta1, ta2), Tuple(tb1, tb2))::constraints ->
+      unify ([(ta1, tb1); (ta2, tb2)] @ constraints)
+  | (TypeVariable v, t)::constraints ->
+      match unify constraints with
+      | Some subst when Map.containsKey v subst ->
+          if Map.find v subst = t then
+              Some subst
+          else
+              None
+      | Some subst -> Some (Map.add v t subst)
+      | None -> None
+  | [] -> Some Map.empty
+  | _ -> None
 
 // Success: r2 has all fields of r1 (and more) - Some ["a", Number]
 unify [Record(Map.ofList ["thing", TypeVariable "a"]),
@@ -108,10 +134,15 @@ let rec substitute (subst:Map<string, Type>) typ =
   | Record r ->
       // TODO: Apply substitute to every field type in r using Map.map.
       // (Hint: Map.map takes a function (key -> value -> result))
-      failwith "not implemented"
+      //failwith "not implemented"
+      Record (Map.map (fun _ v -> substitute subst v) r)
 
   // TODO: Copy your implementation from the previous step
-  | _ -> failwith "implemented in step 4" 
+  | Number -> Number
+  | String -> String
+  | Function(t1, t2) -> Function(substitute subst t1, substitute subst t2)
+  | Tuple(t1, t2) -> Tuple(substitute subst t1, substitute subst t2)
+  | TypeVariable v -> Map.find v subst
 
 // ----------------------------------------------------------------------------
 // Type checker
@@ -119,27 +150,94 @@ let rec substitute (subst:Map<string, Type>) typ =
 
 let rec typeCheck (ctx:TypingContext) expr =
   match expr with
-  | StringConst _ -> failwith "implemented in step 1"
-  | NumberConst _ -> failwith "implemented in step 1"
-  | Binary _ -> failwith "implemented in step 1"
-  | Variable _ -> failwith "implemented in step 1"
-  | If _ -> failwith "implemented in step 1"
-  | Let _ -> failwith "implemented in step 2"
-  | Lambda _ -> failwith "implemented in step 2"
-  | Application _ -> failwith "implemented in step 4"
-  | MakeTuple _ -> failwith "implemented in step 3"
-  | GetTuple _ -> failwith "implemented in step 3"
+  | StringConst _ ->
+      String
+
+  | NumberConst _ ->
+      Number
+
+  | Binary(op, l, r) ->
+      let supportedOps = set ["*"; "/"; "+"; "-"]
+      if not (supportedOps.Contains op) then
+        failwith $"Unknown operator: {op}"
+      else
+        let leftType = typeCheck ctx l
+        let rightType = typeCheck ctx r
+        if leftType <> Number then
+          failwith $"Left argument of '{op}' must be a Number, but got {leftType}"
+        elif rightType <> Number then
+          failwith $"Right argument of '{op}' must be a Number, but got {rightType}"
+        else
+          Number
+
+  | Variable v ->
+      if ctx.ContainsKey v then
+        ctx.[v]
+      else
+        failwith $"Variable '{v}' is unbound"
+
+  | If(e1, e2, e3) ->
+      let conditionType = typeCheck ctx e1
+      if conditionType <> Number then
+        failwith $"Condition of 'if' must be a Number, but got {conditionType}"
+      else
+        let branch1Type = typeCheck ctx e2
+        let branch2Type = typeCheck ctx e3
+        if branch1Type <> branch2Type then
+          failwith $"Branches of 'if' must have the same type, but got {branch1Type} and {branch2Type}"
+        else
+          branch1Type
+
+  | Lambda(v, t, e) ->
+      let newCtx = Map.add v t ctx
+      let bodyType = typeCheck newCtx e
+      Function(t, bodyType)
+
+  | Let(v, e1, e2) ->
+      let bindingType = typeCheck ctx e1
+      let newCtx = Map.add v bindingType ctx
+      typeCheck newCtx e2
+
+  | MakeTuple(e1, e2) ->
+      Tuple(typeCheck ctx e1, typeCheck ctx e2)
+
+  | GetTuple(b, e) ->
+      let tupleType = typeCheck ctx e
+      match tupleType with
+      | Tuple(t1, t2) when b -> t1
+      | Tuple(t1, t2) when not b -> t2
+      | _ -> failwith $"Expected a tuple, but got {tupleType}"
+
+  | Application(e1, e2) ->
+      let funcType = typeCheck ctx e1
+      let argType = typeCheck ctx e2
+      match funcType with
+      | Function(t1a, t2) ->
+          match unify [(t1a, argType)] with
+          | Some subst -> substitute subst t2
+          | None -> failwith $"Argument type mismatch: expected {t1a}, got {argType}"
+      | _ -> failwith $"Expected a function, but got {funcType}"
 
   | MakeRecord(fields) ->
       // TODO: Type-check every field expression and collect the results into
       // a map of field types. Return Record of that map.
-      failwith "not implemented"
+      // failwith "not implemented"
+      let fieldTypes = Map.map (fun _ v -> typeCheck ctx v) fields
+      Record fieldTypes
 
   | GetRecord(e, field) ->
       // TODO: Type-check e - it must be a Record type. Check that 'field'
       // is present in the record's field map (use .ContainsKey). Return the
       // type of that field. Fail if it is not there.
-      failwith "not implemented"
+      // failwith "not implemented"
+      let recordType = typeCheck ctx e
+      match recordType with
+      | Record fieldMap when fieldMap.ContainsKey field ->
+          fieldMap.[field]
+      | Record _ ->
+          failwith $"Field '{field}' does not exist in the record"
+      | _ ->
+          failwith $"Expected a record, but got {recordType}"
 
 
 // ----------------------------------------------------------------------------

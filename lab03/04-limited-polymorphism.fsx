@@ -51,7 +51,24 @@ let rec unify (constraints:list<Type * Type>) : option<Map<_, _>> =
   //    -> If the assignment already contains type that's not 't', that is an error
   //  * [] - all constraints solved, return Some Map.empty
   //  * anything else - types are incompatible, return None
-  | _ -> failwith "todo: implement me!"
+  //1
+  | (String, String)::constraints -> unify constraints
+
+  | (Function(ta1, ta2), Function(tb1, tb2))::constraints ->
+      unify ([(ta1, tb1); (ta2, tb2)] @ constraints)
+  | (Tuple(ta1, ta2), Tuple(tb1, tb2))::constraints ->
+      unify ([(ta1, tb1); (ta2, tb2)] @ constraints)
+  | (TypeVariable v, t)::constraints ->
+      match unify constraints with
+      | Some subst when Map.containsKey v subst ->
+          if Map.find v subst = t then
+              Some subst
+          else
+              None
+      | Some subst -> Some (Map.add v t subst)
+      | None -> None
+  | [] -> Some Map.empty
+  | _ -> None
 
 
 // Success: Some [] - Number matches Number, String matches String
@@ -83,7 +100,14 @@ unify [(Tuple(TypeVariable "a", TypeVariable "a"), Tuple(Number, String))]
 // You can assume all TypeVariables in the type are present in the map.
 
 let rec substitute (subst:Map<string, Type>) typ =
-  failwith "not implemented"
+  //failwith "not implemented"
+  match typ with
+  | Number -> Number
+  | String -> String
+  | Function(t1, t2) -> Function(substitute subst t1, substitute subst t2)
+  | Tuple(t1, t2) -> Tuple(substitute subst t1, substitute subst t2)
+  | TypeVariable v -> Map.find v subst
+
 
 let ab = Map.ofList ["a", Number; "b", String]
 
@@ -105,15 +129,63 @@ substitute ab (Tuple(TypeVariable "a", TypeVariable "b"))
 
 let rec typeCheck (ctx:TypingContext) expr =
   match expr with
-  | StringConst _ -> failwith "implemented in step 1"
-  | NumberConst _ -> failwith "implemented in step 1"
-  | Binary _ -> failwith "implemented in step 1"
-  | Variable _ -> failwith "implemented in step 1"
-  | If _ -> failwith "implemented in step 1"
-  | Let _ -> failwith "implemented in step 2"
-  | Lambda _ -> failwith "implemented in step 2"
-  | MakeTuple _ -> failwith "implemented in step 3"
-  | GetTuple _ -> failwith "implemented in step 3"
+  | StringConst _ ->
+      String
+
+  | NumberConst _ ->
+      Number
+
+  | Binary(op, l, r) ->
+      let supportedOps = set ["*"; "/"; "+"; "-"]
+      if not (supportedOps.Contains op) then
+        failwith $"Unknown operator: {op}"
+      else
+        let leftType = typeCheck ctx l
+        let rightType = typeCheck ctx r
+        if leftType <> Number then
+          failwith $"Left argument of '{op}' must be a Number, but got {leftType}"
+        elif rightType <> Number then
+          failwith $"Right argument of '{op}' must be a Number, but got {rightType}"
+        else
+          Number
+
+  | Variable v ->
+      if ctx.ContainsKey v then
+        ctx.[v]
+      else
+        failwith $"Variable '{v}' is unbound"
+
+  | If(e1, e2, e3) ->
+      let conditionType = typeCheck ctx e1
+      if conditionType <> Number then
+        failwith $"Condition of 'if' must be a Number, but got {conditionType}"
+      else
+        let branch1Type = typeCheck ctx e2
+        let branch2Type = typeCheck ctx e3
+        if branch1Type <> branch2Type then
+          failwith $"Branches of 'if' must have the same type, but got {branch1Type} and {branch2Type}"
+        else
+          branch1Type
+
+  | Lambda(v, t, e) ->
+      let newCtx = Map.add v t ctx
+      let bodyType = typeCheck newCtx e
+      Function(t, bodyType)
+
+  | Let(v, e1, e2) ->
+      let bindingType = typeCheck ctx e1
+      let newCtx = Map.add v bindingType ctx
+      typeCheck newCtx e2
+
+  | MakeTuple(e1, e2) ->
+      Tuple(typeCheck ctx e1, typeCheck ctx e2)
+
+  | GetTuple(b, e) ->
+      let tupleType = typeCheck ctx e
+      match tupleType with
+      | Tuple(t1, t2) when b -> t1
+      | Tuple(t1, t2) when not b -> t2
+      | _ -> failwith $"Expected a tuple, but got {tupleType}"
 
   | Application(e1, e2) ->
       // TODO: Implement function application with unification.
@@ -130,7 +202,15 @@ let rec typeCheck (ctx:TypingContext) expr =
       //  4. If unification returns Some subst, call 'substitute subst t2' to
       //     instantiate any type variables in the return type. Return the result.
       //  5. If unification returns None, fail with a type mismatch error.
-      failwith "not implemented"
+      //failwith "not implemented"
+      let funcType = typeCheck ctx e1
+      let argType = typeCheck ctx e2
+      match funcType with
+      | Function(t1a, t2) ->
+          match unify [(t1a, argType)] with
+          | Some subst -> substitute subst t2
+          | None -> failwith $"Argument type mismatch: expected {t1a}, got {argType}"
+      | _ -> failwith $"Expected a function, but got {funcType}"
 
 
 // ----------------------------------------------------------------------------
