@@ -42,34 +42,78 @@ type State =
 // ----------------------------------------------------------------------------
 
 let gotoNextLine (state:State) line : State option =
-  failwith "implemented in step 1"
+  List.tryFind (fun (l, _) -> l > line) state.Program
+  |> Option.map (fun (lineNum, cmd) -> { state with CurrentLine = lineNum })
 
 let getCurrentCommand state : Command =
-  failwith "implemented in step 1"
+  state.Program
+  |> List.find (fun (lineNum, cmd) -> lineNum = state.CurrentLine)
+  |> snd
 
 let getNumberValue (value:Value) : int =
   // TODO: Helper that extracts numerical value or fails
-  failwith "TODO: not implemented"
-  
+  //failwith "TODO: not implemented"
+  match value with
+  | NumberValue n -> n
+  | _ -> failwith "Expected a number"
+
 // ----------------------------------------------------------------------------
 // Evaluator
 // ----------------------------------------------------------------------------
 
 let printValue (value:Value) =
-  failwith "implemented in step 1"
+  match value with
+  | StringValue s -> printf "%s" s
+  | NumberValue n -> printf "%d" n
+  | BoolValue b -> printf "%b" b
 
 let rec evalExpression state (expr:Expression) : Value =
-  failwith "implemented in steps 1 and 2"
+  match expr with
+  | Const v -> v
+  | Variable var -> 
+      match Map.tryFind var state.Variables with
+      | Some value -> value
+      | None -> failwith "Variable not found"
+  | Function(name, args) ->
+      match name with
+      | "-" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [arg1; arg2] ->
+          match (arg1, arg2) with
+          | (NumberValue n1, NumberValue n2) -> NumberValue (n1 - n2)
+          | _ -> failwith "Type error in subtraction"
+        | _ -> failwith "Subtraction expects exactly 2 arguments"
+      | "=" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [arg1; arg2] -> BoolValue (arg1 = arg2)
+        | _ -> failwith "Equality expects exactly 2 arguments"
+      | _ -> failwith "Unknown function"
+
 
 let rec runCommand state cmd : State option =
   match cmd with
-  | Print _ ->
+  | Print(expr, newline) ->
       // TODO: Modify 'printValue' to use 'printf' (not 'printfn')
       // and print a '\n' character here if required. 
-      failwith "TODO: not implemented"
-  | Goto _ -> failwith "implemented in step 1"
-  | Assign _ -> failwith "implemented in step 2"
-  | If _ -> failwith "implemented in step 2"
+      //failwith "TODO: not implemented"
+      let value = evalExpression state expr
+      printValue value
+      if newline then printf "\n"
+      gotoNextLine state (state.CurrentLine)
+
+  | Goto(target) ->
+      { state with CurrentLine = target } |> Some
+
+  | Assign (var, expr) -> 
+      let value = evalExpression state expr
+      let newVariables = Map.add var value state.Variables
+      gotoNextLine { state with Variables = newVariables } (state.CurrentLine)
+
+  | If (expr, ifCmd) -> 
+      let condition = evalExpression state expr
+      match condition with
+      | BoolValue true -> runCommand state ifCmd
+      | _ -> gotoNextLine state (state.CurrentLine)
 
   // TODO: FOR <v> = <e1> TO <e2> sets the loop variable <V> to the lower bound
   // (obtained by evaluating <e1>). We then need to remember that we started
@@ -77,18 +121,44 @@ let rec runCommand state cmd : State option =
   // bound and (iii) the current line) to LoopStack so that NEXT <v> knows 
   // where to jump and when to stop. Then continue into the loop body.
   // (hint: use getNumberValue helper here!)
-  | For _ -> failwith "not implemented"
+  | For (var, start, endExpr) -> 
+      let lowerBound = getNumberValue (evalExpression state start)
+      let upperBound = getNumberValue (evalExpression state endExpr)
+      let newVariables = Map.add var (NumberValue lowerBound) state.Variables
+      let loopInfo = (var, upperBound, state.CurrentLine)
+      gotoNextLine { state with Variables = newVariables; LoopStack = loopInfo :: state.LoopStack } (state.CurrentLine)
 
   // TODO: NEXT <v> increments the variable <v> by 1. Then look through the 
   // LoopStack to find the loop for this variable. If we are within bounds,
   // use gotoNextLine to jump to the line just after the loop start. If we 
   // finished looping, remove the LoopStack record (hint: List.filter) and 
   // continue (gotoNextLine).
-  | Next _ -> failwith "not implemented"
+  | Next (var) -> //failwith "not implemented"
+      let incrementedValue = 
+        match Map.tryFind var state.Variables with
+        | Some (NumberValue n) -> NumberValue (n + 1)
+        | _ -> failwith "Loop variable not found or not a number"
+      let newVariables = Map.add var incrementedValue state.Variables
+      match List.tryFind (fun (v, _, _) -> v = var) state.LoopStack with
+      | Some (_, upperBound, forLine) ->
+          if getNumberValue incrementedValue <= upperBound then
+              gotoNextLine { state with Variables = newVariables } forLine
+          else
+              let newLoopStack = List.filter (fun (v, _, _) -> v <> var) state.LoopStack
+              gotoNextLine { state with Variables = newVariables; LoopStack = newLoopStack } (state.CurrentLine)
+      | None -> failwith "NEXT without matching FOR"
+
+
+let rec runCurrentCommand state = 
+  runCommand state (getCurrentCommand state) 
+
 
 let rec runProgram state : unit =
-  failwith "implemented in step 1"
-
+  let rec loop state =
+    match runCurrentCommand state with
+    | Some newState -> loop newState
+    | None -> ()
+  loop state
 // ----------------------------------------------------------------------------
 // Test cases
 // ----------------------------------------------------------------------------

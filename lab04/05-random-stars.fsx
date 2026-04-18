@@ -43,26 +43,37 @@ type State =
 // ----------------------------------------------------------------------------
 
 let gotoNextLine (state:State) line : State option =
-  failwith "implemented in step 1"
+  List.tryFind (fun (l, _) -> l > line) state.Program
+  |> Option.map (fun (lineNum, cmd) -> { state with CurrentLine = lineNum })
 
 let getCurrentCommand state : Command =
-  failwith "implemented in step 1"
+  state.Program
+  |> List.find (fun (lineNum, cmd) -> lineNum = state.CurrentLine)
+  |> snd
 
 // ----------------------------------------------------------------------------
 // Evaluator
 // ----------------------------------------------------------------------------
 
 let getNumberValue value = 
-  failwith "implemented in step 3"
+  match value with
+  | NumberValue n -> n
+  | _ -> failwith "Expected a number"
 
 let getVariableValue state (name:char) = 
-  failwith "implemented in step 4"
+  Map.tryFind (int name) state.Memory
+  |> Option.map NumberValue
+  |> Option.defaultValue (NumberValue 0)
 
 let setVariableValue state (name:char) value = 
-  failwith "implemented in step 4"
+  let numericValue = getNumberValue value
+  { state with Memory = Map.add (int name) numericValue state.Memory }
 
 let printValue (value:Value) = 
-  failwith "implemented in step 1"
+  match value with
+  | StringValue s -> printf "%s" s
+  | NumberValue n -> printf "%d" n
+  | BoolValue b -> printf "%b" b
 
 // NOTE: Helper function that makes it easier to implement '>' and '<' operators
 // (takes a function 'int -> int -> bool' and "lifts" it into 'Value -> Value -> Value')
@@ -78,35 +89,149 @@ let rec evalExpression state expr =
   // To add < and >, you can use the 'binaryRelOp' helper above. You can similarly
   // add helpers for numerical operators and binary Boolean operators to make
   // your code a bit nicer. 
-  failwith "implemented in steps 1 and 3"
+  //failwith "implemented in steps 1 and 3"
+  match expr with
+  | Const v -> v
+  | Variable var -> getVariableValue state var
+  | Function(name, args) ->
+      match name with
+      | "-" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [arg1; arg2] ->
+          match (arg1, arg2) with
+          | (NumberValue n1, NumberValue n2) -> NumberValue (n1 - n2)
+          | _ -> failwith "Type error in subtraction"
+        | _ -> failwith "Subtraction expects exactly 2 arguments"
+      | "+" ->
+        match args |> List.map (fun arg -> evalExpression state arg) with
+        | [NumberValue n1; NumberValue n2] -> NumberValue (n1 + n2)
+        | _ -> failwith "Addition expects exactly 2 numerical arguments"
+      | "*" ->
+        match args |> List.map (fun arg -> evalExpression state arg) with
+        | [NumberValue n1; NumberValue n2] -> NumberValue (n1 * n2)
+        | _ -> failwith "Multiplication expects exactly 2 numerical arguments"
+      | "=" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [arg1; arg2] -> BoolValue (arg1 = arg2)
+        | _ -> failwith "Equality expects exactly 2 arguments"
+      | "||" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [arg1; arg2] ->
+          match (arg1, arg2) with
+          | (BoolValue b1, BoolValue b2) -> BoolValue (b1 || b2)
+          | _ -> failwith "Type error in logical OR"
+        | _ -> failwith "Logical OR expects exactly 2 arguments"
+      | "<" ->
+        args
+        |> List.map (evalExpression state)
+        |> binaryRelOp (<)
+      | ">" ->
+        args
+        |> List.map (evalExpression state)
+        |> binaryRelOp (>)
+      | "RND" ->
+        match args |> List.map (fun arg -> evalExpression state (arg)) with
+        | [NumberValue n] -> NumberValue (state.Random.Next(n))
+        | _ -> failwith "RND expects exactly 1 numerical argument"
+      | _ -> failwith (sprintf "Unknown function: %s" name)
 
 
 let rec runCommand state cmd : State option =
   match cmd with
-  | Goto _ -> failwith "implemented in step 1"
-  | Assign _ -> failwith "implemented in step 4"
-  | If _ -> failwith "implemented in step 2"
-  | Poke _ -> failwith "implemented in step 4"
-  | Peek _ -> failwith "implemented in step 4"
-  | For _ -> failwith "implemented in step 3"
-  | Next _ -> failwith "implemented in step 3"
-  | Print _ -> failwith "implemented in step 1"
+  | Print(expr, newline) ->
+      let value = evalExpression state expr
+      printValue value
+      if newline then printf "\n"
+      gotoNextLine state (state.CurrentLine)
+
+  | Goto(target) ->
+      { state with CurrentLine = target } |> Some
+
+  | Assign(name, expr) ->
+      let value = evalExpression state expr
+      let newState = setVariableValue state name value
+      gotoNextLine newState state.CurrentLine
+
+  | If (expr, ifCmd) -> 
+      let condition = evalExpression state expr
+      match condition with
+      | BoolValue true -> runCommand state ifCmd
+      | _ -> gotoNextLine state (state.CurrentLine)
+
+  | Poke(addr, expr) ->
+      let targetAddress = getNumberValue (evalExpression state addr)
+      let value = getNumberValue (evalExpression state expr)
+      let newState = { state with Memory = Map.add targetAddress value state.Memory }
+      gotoNextLine newState state.CurrentLine
+
+  | Peek(name, addr) ->
+      // TODO: Evaluate 'addr' to get a memory address, read the int stored
+      // there, and store it as the value of variable 'name' (use setVariableValue).
+      // This is the read counterpart to Poke.
+      let targetAddress = getNumberValue (evalExpression state addr)
+      let value = Map.tryFind targetAddress state.Memory |> Option.defaultValue 0
+      let newState = setVariableValue state name (NumberValue value)
+      gotoNextLine newState state.CurrentLine
+
+  | For (var, start, endExpr) -> 
+      let lowerBound = getNumberValue (evalExpression state start)
+      let upperBound = getNumberValue (evalExpression state endExpr)
+      let newState = setVariableValue state var (NumberValue lowerBound)
+      let loopInfo = (var, upperBound, state.CurrentLine)
+      gotoNextLine { newState with LoopStack = loopInfo :: newState.LoopStack } (state.CurrentLine)
+
+  | Next (var) -> //failwith "not implemented"
+      let currentValue = getNumberValue (getVariableValue state var)
+      let incrementedValue = NumberValue (currentValue + 1)
+      let newState = setVariableValue state var incrementedValue
+      match List.tryFind (fun (v, _, _) -> v = var) state.LoopStack with
+      | Some (_, upperBound, forLine) ->
+          if getNumberValue incrementedValue <= upperBound then
+              gotoNextLine newState forLine
+          else
+              let newLoopStack = List.filter (fun (v, _, _) -> v <> var) state.LoopStack
+              gotoNextLine { newState with LoopStack = newLoopStack } (state.CurrentLine)
+      | None -> failwith "NEXT without matching FOR"
 
   | Update ->
       // TODO: Render the screen region of Memory to the console.
       // For each of the 20 rows, set Console.CursorTop and Console.CursorLeft,
       // then print all 60 characters in that row as a single string
       // (look up each address 1024 + row*60 + col; use ' ' if not found).
-      failwith "TODO: not implemented"
+      //failwith "TODO: not implemented"
+      let rowsToRender = min 20 Console.BufferHeight
+      let colsToRender = min 60 Console.BufferWidth
+      for row in 0 .. rowsToRender - 1 do
+          Console.CursorTop <- row
+          Console.CursorLeft <- 0
+          let lineChars : char array =
+            [ for col in 0 .. colsToRender - 1 ->
+              let addr = 1024 + row * 60 + col
+              Map.tryFind addr state.Memory
+              |> Option.map char
+              |> Option.defaultValue ' ' ]
+            |> Array.ofList
+          printf "%s" (String lineChars)
+      gotoNextLine state (state.CurrentLine)
 
   | Clear ->
       // TODO: Write int ' ' into every screen address (1024..1024+20*60-1)
       // in state.Memory, leaving all other addresses untouched, then advance.
-      failwith "TODO: not implemented"
+      //failwith "TODO: not implemented"
+      let screenAddresses = [1024 .. 1024 + 20 * 60 - 1]
+      let newMemory = List.fold (fun mem addr -> Map.add addr (int ' ') mem) state.Memory screenAddresses
+      gotoNextLine { state with Memory = newMemory } state.CurrentLine
+
+let rec runCurrentCommand state = 
+  runCommand state (getCurrentCommand state) 
+
 
 let rec runProgram state : unit =
-  failwith "implemented in step 1"
-
+  let rec loop state =
+    match runCurrentCommand state with
+    | Some newState -> loop newState
+    | None -> ()
+  loop state
 // ----------------------------------------------------------------------------
 // Test cases
 // ----------------------------------------------------------------------------

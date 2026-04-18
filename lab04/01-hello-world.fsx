@@ -37,12 +37,18 @@ let gotoNextLine (state:State) line : State option =
   // where 'CurrentLine' is set to the next line. If there is no next line, 
   // return 'None', otherwise return 'Some newState'. You can assume that the 
   // list of program lines is sorted.
-  failwith "TODO: not implemented"
+  //failwith "TODO: not implemented"
+  List.tryFind (fun (l, _) -> l > line) state.Program
+  |> Option.map (fun (lineNum, cmd) -> { state with CurrentLine = lineNum })
+
 
 let getCurrentCommand state : Command =
   // TODO: Return the command at the current line (hint: use List.find)
   // You can assume that the state is well-formed, i.e., the line is there.
-  failwith "TODO: not implemented"
+  //failwith "TODO: not implemented"
+  state.Program
+  |> List.find (fun (lineNum, cmd) -> lineNum = state.CurrentLine)
+  |> snd
 
 // Test cases
 let state1 = { Program = [ 10, Print(Const(StringValue "HI")) ]; CurrentLine = 10 }
@@ -57,13 +63,16 @@ getCurrentCommand state1  // Returns the Print command
 
 let printValue (value:Value) =
   // TODO: Print the value nicely using e.g. printf "%s" for strings
-  failwith "TODO: not implemented"
-
+  //failwith "TODO: not implemented"
+  match value with
+  | StringValue s -> printf "%s" s
 
 let rec evalExpression (expr:Expression) : Value =
   // TODO: Evaluate an expression - for now, this is trivial because
   // our only expression is a constant which contains a value!
-  failwith "TODO: not implemented"
+  //failwith "TODO: not implemented"
+  match expr with
+  | Const v -> v
 
 let rec runCurrentCommand state = 
   // Note that 'runCommand' takes the command to run (this will be useful in 
@@ -76,11 +85,14 @@ and runCommand cmd state : State option =
   | Print(expr) ->
       // TODO: Evaluate the expression and print the resulting value
       // Then return new state with the next line (hint: gotoNextLine)
-      failwith "TODO: not implemented"
+      let value = evalExpression expr
+      printValue value
+      gotoNextLine state (state.CurrentLine)
 
   | Goto(target) ->
       // TODO: Return a new state with the modified CurrentLine
-      failwith "TODO: not implemented"
+      //failwith "TODO: not implemented"
+      { state with CurrentLine = target } |> Some
 
 
 let rec runProgram state : unit = 
@@ -88,7 +100,12 @@ let rec runProgram state : unit =
   // TODO: Run the program. Call 'runCommand' in a loop until
   // the function returns 'None' indicating the end of the program.
   // Then return the unit value - you can write just "()" to return.
-  failwith "TODO: not implemented"  
+  //failwith "TODO: not implemented"  
+  let rec loop state =
+    match runCurrentCommand state with
+    | Some newState -> loop newState
+    | None -> ()
+  loop state
 
 // ----------------------------------------------------------------------------
 // Test cases
