@@ -43,10 +43,15 @@ let printString (obj : Objekt) : unit =
 // ----------------------------------------------------------------------------
 
 let getParents (obj : Objekt) : Objekt list =
-  failwith "copy from step 1"
+  obj.Slots |> List.choose (fun slot ->
+    if slot.Name.EndsWith("*") then Some slot.Value else None)
 
 let rec findSlots (name : string) (obj : Objekt) : Slot list =
-  failwith "copy from step 1"
+  let directSlots = obj.Slots |> List.filter (fun slot -> slot.Name = name)
+  if List.isEmpty directSlots then
+    getParents obj |> List.collect (findSlots name)
+  else
+    directSlots
 
 let send (name : string) (args : list<string * Objekt>) (obj : Objekt) : Objekt =
   // TODO: Add support for method arguments via an activation record.
@@ -60,7 +65,15 @@ let send (name : string) (args : list<string * Objekt>) (obj : Objekt) : Objekt 
   //   
   // Second, call 'f activation' and return the result. The remaining cases 
   // (plain value, not found, ambiguous) are the same as in step 2.
-  failwith "not implemented"
+  findSlots name obj |> function
+  | [slot] ->
+    match slot.Value.Special with
+    | Some(Code f) ->
+      let activation = makeObject (args @ [ "target*", obj ])
+      f activation
+    | _ -> slot.Value
+  | [] -> failwith "Slot not found"
+  | _ -> failwith "Ambiguous slot"
 
 // ----------------------------------------------------------------------------
 // Primitive string objects with a prototype carrying string methods
@@ -79,7 +92,13 @@ let rec stringPrototype : Objekt = makeObject [
     // NOTE: You can call 'ObjektVis.print' to visualize the activation record.
     // This way, you can see if you constructed it correctly!
     //
-    failwith "not implemented")
+    //failwith "not implemented")
+    let target = send "target*" [] activation
+    let other = send "other" [] activation
+    match target.Special, other.Special with
+    | Some(String s1), Some(String s2) -> makeString (s1 + s2)
+    | _ -> failwith "arguments must be strings"
+  )
 ]
 
 and makeString (s : string) : Objekt =

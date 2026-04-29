@@ -41,20 +41,31 @@ let getParents (obj : Objekt) : Objekt list =
   // TODO: Return the values of all parent slots.
   // Parent slots are identified by their name ending with '*'.
   // Use List.choose to filter and unwrap in one step or List.filter & List.map
-  failwith "todo"
+  //failwith "todo"
+  obj.Slots |> List.choose (fun slot ->
+    if slot.Name.EndsWith("*") then Some slot.Value else None)
 
 let rec findSlots (name : string) (obj : Objekt) : Slot list =
   // TODO: Search for a slot by name. If the slot is not found directly
   // in the object, follow the prototype chain using getParents.
   // Returns a list because the same name might be reachable via multiple
   // parent paths; the caller treats multiple results as an error.
-  failwith "todo"
+  //failwith "todo"
+  let directSlots = obj.Slots |> List.filter (fun slot -> slot.Name = name)
+  if List.isEmpty directSlots then
+    getParents obj |> List.collect (findSlots name)
+  else
+    directSlots
 
 let send (name : string) (obj : Objekt) : Objekt =
   // TODO: Look up a slot by name and return its value.
   // Exactly one result is expected: zero means the slot is missing,
   // more than one means the name is ambiguous across parent paths.
-  failwith "todo"
+  //failwith "todo"
+  findSlots name obj |> function
+  | [slot] -> slot.Value
+  | [] -> failwith "Slot not found"
+  | _ -> failwith "Ambiguous slot"
 
 // ----------------------------------------------------------------------------
 // Primitive string objects

@@ -70,16 +70,25 @@ let makeClass name super methods =
 // ----------------------------------------------------------------------------
 
 let tryFindSlot (name : string) (obj : Objekt) : Objekt option =
-  failwith "copy from step 5"
+  obj.Slots |> List.tryPick (fun slot ->
+    if slot.Name = name then Some slot.Value else None)
 
 let tryFindSuper (cls : Objekt) : Objekt option =
-  failwith "copy from step 5"
+  tryFindSlot "super*" cls
 
 let findClass (obj : Objekt) : Objekt =
-  failwith "copy from step 5"
+  tryFindSlot "class*" obj |> Option.get
 
 let rec lookupMethod (name : string) (cls : Objekt) : (Objekt -> Objekt -> Objekt) option =
-  failwith "copy from step 5"
+  match tryFindSlot name cls with
+  | Some methodObj ->
+    match methodObj.Special with
+    | Some(Code f) -> Some f
+    | _ -> failwith "slot is not a method"
+  | None ->
+    match tryFindSuper cls with
+    | Some super -> lookupMethod name super
+    | None -> None
 
 // ----------------------------------------------------------------------------
 // Argument lists and send
@@ -99,7 +108,9 @@ let makeArgsList (args : list<string * Objekt>) : Objekt =
   let getters = 
     // For each of the 'arg', we want to create a getter of the same
     // name, which uses 'tryFindSlot' to fetch the slot value.
-    failwith "TODO"    
+    //failwith "TODO"
+    args |> List.map (fun (argName, _) ->
+      argName, (fun inst _ -> tryFindSlot argName inst |> Option.get))
   let specialArgsList = makeClass "__ArgsList" ArgsList getters
   // Now we create instance of the new class, containing the arg values
   makeInstance specialArgsList args
@@ -109,7 +120,11 @@ let makeArgsList (args : list<string * Objekt>) : Objekt =
 // method function, matching the new 'Objekt -> Objekt -> Objekt' signature.
 // The error message also now includes the class name for easier debugging.
 let send (name : string) (args : list<string * Objekt>) (obj : Objekt) : Objekt =
-  failwith "not implemented"
+  //failwith "not implemented"
+  let cls = findClass obj
+  match lookupMethod name cls with
+  | Some f -> f obj (makeArgsList args)
+  | None -> failwith "message not understood"
 
 // ----------------------------------------------------------------------------
 // Bootstrapping: Object, Class, and Str
@@ -139,7 +154,10 @@ let Str' : Objekt = makeClass "String" Object [
     // TODO: 'append' concatenates two strings.
     // Access the argument by sending "other" to 'args'.
     // Match both 'inst' and 'other' as Some(String s) and return makeString (s1 + s2).
-    failwith "not implemented")
+    let other = args |> send "other" []
+    match inst.Special, other.Special with
+    | Some(String s1), Some(String s2) -> makeString (s1 + s2)
+    | _ -> failwith "append: arguments must be strings")
 ]
 Str.Slots <- Str'.Slots
 
@@ -188,4 +206,4 @@ cheshire |> send "speak" [] |> getStringValue  // "We are all mad!"
 
 // TESTS: Test the 'describe' method
 cheshire |> send "describe" [] |> getStringValue
-mog |> send "describe" [] |> getStringValue
+mog |> send "describe" [] |> getStringValue 

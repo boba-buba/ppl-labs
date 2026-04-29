@@ -84,17 +84,21 @@ let tryFindSlot (name : string) (obj : Objekt) : Objekt option =
   // TODO: Search for a slot named 'name' directly on 'obj', with no inheritance
   // (this is data lookup). Return Some(value) if found, None otherwise.
   // (Hint: use List.tryPick on obj.Slots)
-  failwith "not implemented"
+  //failwith "not implemented"
+  obj.Slots |> List.tryPick (fun slot ->
+    if slot.Name = name then Some slot.Value else None)
 
 let tryFindSuper (cls : Objekt) : Objekt option =
   // TODO: Return the superclass of 'cls', or None if it has no superclass.
   // The superclass is stored in the 'super*' slot.
-  failwith "not implemented"
+  //failwith "not implemented"
+  tryFindSlot "super*" cls
 
 let findClass (obj : Objekt) : Objekt =
   // TODO: Return the class of 'obj'.
   // The class is stored in the 'class*' slot; fail if it is absent.
-  failwith "not implemented"
+  //failwith "not implemented"
+  tryFindSlot "class*" obj |> Option.get
 
 let rec lookupMethod (name : string) (cls : Objekt) : (Objekt -> Objekt) option =
   // TODO: Search for a method named 'name' starting at class 'cls'.
@@ -102,14 +106,27 @@ let rec lookupMethod (name : string) (cls : Objekt) : (Objekt -> Objekt) option 
   // value is a Code method, return Some f. If found but not a Code, fail.
   // If not found in 'cls', recurse into the superclass via 'tryFindSuper'.
   // Return None if the entire hierarchy is exhausted without finding it.
-  failwith "not implemented"
+  //failwith "not implemented"
+  match tryFindSlot name cls with
+  | Some methodObj ->
+    match methodObj.Special with
+    | Some(Code f) -> Some f
+    | _ -> failwith "slot is not a method"
+  | None ->
+    match tryFindSuper cls with
+    | Some super -> lookupMethod name super
+    | None -> None
 
 let send (name : string) (obj : Objekt) : Objekt =
   // TODO: Send message 'name' to 'obj'.
   // First, find the class of 'obj', look up the method in the class hierarchy.
   // Then, call it with 'obj' as the receiver. Fail with "message not understood"
   // if no method is found (Again, we are starting with a version with no arguments.)
-  failwith "not implemented"
+  //failwith "not implemented"
+  let cls = findClass obj
+  match lookupMethod name cls with
+  | Some f -> f obj
+  | None -> failwith "message not understood"
 
 // ----------------------------------------------------------------------------
 // DEMO: Class hierarchy with inherited and overridden methods

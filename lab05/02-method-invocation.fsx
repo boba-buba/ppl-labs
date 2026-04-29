@@ -49,17 +49,28 @@ let printString (obj : Objekt) : unit =
 // ----------------------------------------------------------------------------
 
 let getParents (obj : Objekt) : Objekt list =
-  failwith "copy from step 1"
+  obj.Slots |> List.choose (fun slot ->
+    if slot.Name.EndsWith("*") then Some slot.Value else None)
 
 let rec findSlots (name : string) (obj : Objekt) : Slot list =
-  failwith "copy from step 1"
+  let directSlots = obj.Slots |> List.filter (fun slot -> slot.Name = name)
+  if List.isEmpty directSlots then
+    getParents obj |> List.collect (findSlots name)
+  else
+    directSlots
 
 let send (name : string) (obj : Objekt) : Objekt =
   // TODO: Extend 'send' from step 1 to handle method invocation.
   // When 'findSlots' returns a slot whose value has Special = Some(Code f),
   // call 'f obj' - passing the receiver as the argument - and return the result.
   // The rest is the same as in step #1
-  failwith "not implemented"
+  findSlots name obj |> function
+  | [slot] ->
+    match slot.Value.Special with
+    | Some(Code f) -> f obj
+    | _ -> slot.Value
+  | [] -> failwith "Slot not found"
+  | _ -> failwith "Ambiguous slot"
 
 // ----------------------------------------------------------------------------
 // Primitive string objects
@@ -91,7 +102,13 @@ let empty : Objekt = makeObject []
 // The method should use 'send' to look up the 'name' slot on the receiver
 // and pass the result to 'printString'. Return 'empty' as the result.
 let printable : Objekt =
-  failwith "not implemented"
+  makeObject [
+    "print", makeMethod (fun obj ->
+      let name = obj |> send "name"
+      name |> printString
+      empty
+    )
+  ]
 
 
 let alice = makeObject [
@@ -111,17 +128,20 @@ let aristocrat = makeObject [
 // This is an example of a mixin: 'printable' contributes behaviour orthogonal
 // to the animal/fictional hierarchy, mixed in by adding another parent slot.
 let cheshire = makeObject [
+  "printable*", printable
   "animal*", cat
   "fictional*", alice
   "name", makeString "Cheshire cat"
   "sound", makeString "We are all mad!"
 ]
 let mog = makeObject [
+  "printable*", printable
   "animal*", cat
   "fictional*", forgetful
   "name", makeString "Mog"
 ]
 let larry = makeObject [
+  "printable*", printable
   "animal*", cat
   "aristocrat*", aristocrat
   "name", makeString "Larry"

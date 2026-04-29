@@ -44,13 +44,26 @@ let printValue (obj : Objekt) : unit =
 // ----------------------------------------------------------------------------
 
 let getParents (obj : Objekt) : Objekt list =
-  failwith "copy from step 1"
+  obj.Slots |> List.choose (fun slot ->
+    if slot.Name.EndsWith("*") then Some slot.Value else None)
 
 let rec findSlots (name : string) (obj : Objekt) : Slot list =
-  failwith "copy from step 1"
+  let directSlots = obj.Slots |> List.filter (fun slot -> slot.Name = name)
+  if List.isEmpty directSlots then
+    getParents obj |> List.collect (findSlots name)
+  else
+    directSlots
 
 let send (name : string) (args : list<string * Objekt>) (obj : Objekt) : Objekt =
-  failwith "copy from step 3"
+  findSlots name obj |> function
+  | [slot] ->
+    match slot.Value.Special with
+    | Some(Code f) ->
+      let activation = makeObject (args @ [ "target*", obj ])
+      f activation
+    | _ -> slot.Value
+  | [] -> failwith "Slot not found"
+  | _ -> failwith "Ambiguous slot"
 
 // ----------------------------------------------------------------------------
 // Booleans and blocks as objects
@@ -66,7 +79,12 @@ let makeBool (b : bool) : Objekt =
       // TODO: Implement boolean conditional as a message send.
       // Retrieve the 'then' and 'else' arguments from 'activation' using 'send'.
       // Pick the branch corresponding to 'b', then invoke it by sending 'do'.
-      failwith "not implemented")
+      //failwith "not implemented")
+      let thenBranch = send "then" [] activation
+      let elseBranch = send "else" [] activation
+      let chosenBranch = if b then thenBranch else elseBranch
+      send "do" [] chosenBranch
+      )
   ]
 
 // 'makeBlock' wraps an F# function as an object with a 'do' method.
@@ -81,15 +99,23 @@ let makeBlock (f : unit -> Objekt) : Objekt =
 // ----------------------------------------------------------------------------
 
 let rec stringPrototype : Objekt = makeObject [
-  "append", makeMethod (fun o ->
-    // TODO: copy from step 3
-    failwith "copy from step 3")
-
-  "equals", makeMethod (fun o ->
+  "append", makeMethod (fun activation ->
+    let target = send "target*" [] activation
+    let other = send "other" [] activation
+    match target.Special, other.Special with
+    | Some(String s1), Some(String s2) -> makeString (s1 + s2)
+    | _ -> failwith "arguments must be strings"
+  )
+ 
+  "equals", makeMethod (fun activation ->
     // TODO: Implement string equality.
     // Access receiver and argument the same way as in 'append'.
     // Return 'makeBool (s1 = s2)' rather than a string.
-    failwith "not implemented")
+    let target = send "target*" [] activation
+    let other = send "other" [] activation
+    match target.Special, other.Special with
+    | Some(String s1), Some(String s2) -> makeBool (s1 = s2)
+    | _ -> failwith "arguments must be strings")
 ]
 
 and makeString (s : string) : Objekt =
