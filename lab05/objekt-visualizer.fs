@@ -71,18 +71,27 @@ let private printSprites (sprites:seq<Sprite>) =
   let mutable top = 0
   let mutable currentHeight = 0
   System.Console.Clear()
+  let windowWidth = max 1 System.Console.WindowWidth
+  let bufferWidth = max 1 System.Console.BufferWidth
+  let bufferHeight = max 1 System.Console.BufferHeight
   for sprite in sprites do
-    if left + sprite.Width > System.Console.WindowWidth then
+    if left + sprite.Width > windowWidth then
       left <- 0
       top <- top + currentHeight + 1
+      currentHeight <- 0
     for i, l in List.indexed sprite.Lines do
-      System.Console.CursorLeft <- left
-      System.Console.CursorTop <- top + i
-      System.Console.Write(l)
+      let row = top + i
+      if row >= 0 && row < bufferHeight then
+        let safeLeft = max 0 (min left (bufferWidth - 1))
+        let available = max 0 (bufferWidth - safeLeft)
+        let text = if l.Length > available then l.Substring(0, available) else l
+        System.Console.CursorLeft <- safeLeft
+        System.Console.CursorTop <- row
+        System.Console.Write(text)
     currentHeight <- max currentHeight sprite.Height
     left <- left + sprite.Width + 2
   System.Console.CursorLeft <- 0
-  System.Console.CursorTop <- top + currentHeight + 1
+  System.Console.CursorTop <- max 0 (min (top + currentHeight + 1) (bufferHeight - 1))
 
 
 /// Visualize all objects that can be reached from the given object.
