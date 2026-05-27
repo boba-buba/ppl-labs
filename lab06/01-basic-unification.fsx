@@ -41,26 +41,37 @@ let rec unifyLists l1 l2 : option<Substitution> =
   match l1, l2 with 
   | [], [] -> 
       // TODO: Succeeds, but returns an empty substitution
-      failwith "not implemented"
+      //failwith "not implemented"
+      Some(Map.empty)
   | h1::t1, h2::t2 -> 
       // TODO: Unify 'h1' with 'h2' using 'unify' and
       // 't1' with 't2' using 'unifyLists'. If both 
       // succeed, return the generated joint substitution!
       // (For now, you can use the above 'appendSubstitutions' helper)
-      failwith "not implemented"
+      //failwith "not implemented"
+      match unify h1 h2 with
+      | Some sub1 ->
+          match unifyLists t1 t2 with
+          | Some sub2 -> Some(appendSubstitutions sub1 sub2)
+          | None -> None
+      | None -> None
   | _ -> 
     // TODO: Lists cannot be unified 
-    failwith "not implemented"
+    //failwith "not implemented"
+    None
 
 and unify t1 t2 : option<Substitution> = 
-  match t1, t2 with 
-  | _ ->
       // TODO: Add all the necessary cases here!
       // * For matching atoms, return empty substitution (Map.empty)
       // * For matching predicates, return the result of 'unifyLists'
       // * For variable and any term, return a new substitution (Map.ofList)
       // * For anything else, return None (failed to unify) 
-      failwith "not implemented"
+      //failwith "not implemented"
+    match t1, t2 with
+    | Atom a1, Atom a2 when a1 = a2 -> Some(Map.empty)
+    | Predicate(p1, args1), Predicate(p2, args2) when p1 = p2 -> unifyLists args1 args2
+    | Variable v, term | term, Variable v -> Some(Map.ofList [(v, term)])
+    | _ -> None
 
 // ----------------------------------------------------------------------------
 // Basic unification tests 

@@ -26,19 +26,39 @@ let appendSubstitutions sub1 sub2 =
 // ----------------------------------------------------------------------------
 
 let rec substitute (subst:Substitution) term = 
-  failwith "implemented in step 2"
+  match term with
+  | Atom _ -> term
+  | Variable v -> Map.tryFind v subst |> Option.defaultValue term
+  | Predicate(p, args) -> Predicate(p, List.map (substitute subst) args)
+
+
 
 let substituteSubst (newSubst:Substitution) (subst:Substitution) = 
-  failwith "implemented in step 2"
+  Map.map (fun var term -> substitute newSubst term) subst
+
 
 let substituteTerms subst (terms:list<Term>) = 
-  failwith "implemented in step 2"
+  List.map (substitute subst) terms
 
 let rec unifyLists l1 l2 = 
-  failwith "implemented in steps 1 and 2"
-
+  match l1, l2 with 
+  | [], [] -> Some(Map.empty)
+  | h1::t1, h2::t2 -> 
+      match unify h1 h2 with
+      | Some sub1 ->
+          let t1' = substituteTerms sub1 t1
+          let t2' = substituteTerms sub1 t2
+          match unifyLists t1' t2' with
+          | Some sub2 -> Some(appendSubstitutions (substituteSubst sub2 sub1) sub2)
+          | None -> None
+      | None -> None
+  | _ -> None
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+    match t1, t2 with
+    | Atom a1, Atom a2 when a1 = a2 -> Some(Map.empty)
+    | Predicate(p1, args1), Predicate(p2, args2) when p1 = p2 -> unifyLists args1 args2
+    | Variable v, term | term, Variable v -> Some(Map.ofList [(v, term)])
+    | _ -> None
 
 // ----------------------------------------------------------------------------
 // Searching the program (database) and variable renaming
@@ -52,7 +72,11 @@ let rec freeVariables term =
   // TODO: Return a list of all variables that appear in 'term'
   // (this may contain duplicates, we will eliminate them below)
   // HINT: Use List.collect: ('a -> list<'b>) -> list<'a> -> list<'b>
-  failwith "not implemented"
+  // failwith "not implemented"
+  match term with
+  | Atom _ -> []
+  | Variable v -> [v]
+  | Predicate(_, args) -> List.collect freeVariables args
 
 
 let withFreshVariables (clause:Clause) : Clause =
@@ -67,7 +91,19 @@ let withFreshVariables (clause:Clause) : Clause =
   //
   // This may not be correct if the user-provided names of variables
   // had numbers in them in a certain format, but that's OK for now! 
-  failwith "not implemented"
+  // failwith "not implemented"
+  let vars =
+    freeVariables clause.Head
+    @ List.collect freeVariables clause.Body
+    |> List.distinct
+
+  let subst =
+    vars
+    |> List.map (fun v -> (v, Variable(v + string (nextNumber()))))
+    |> Map.ofList
+
+  { Head = substitute subst clause.Head
+    Body = substituteTerms subst clause.Body }
 
 
 let query (program:list<Clause>) (query:Term) : list<Clause * Substitution> =
@@ -81,7 +117,13 @@ let query (program:list<Clause>) (query:Term) : list<Clause * Substitution> =
   // clause and a substitution (list<string * Term>). Calling 'unify'
   // gives you 'option<list<string * Term>>', so you need to pattern match
   // on this and if it is 'Some(subst)' return 'Some(clause, subst)'.
-  failwith "not implemented"
+  // failwith "not implemented"
+  program
+  |> List.choose (fun clause ->
+      let freshClause = withFreshVariables clause
+      match unify freshClause.Head query with
+      | Some subst -> Some(freshClause, subst)
+      | None -> None)
 
 
 // ----------------------------------------------------------------------------

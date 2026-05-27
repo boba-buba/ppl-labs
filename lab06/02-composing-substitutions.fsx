@@ -30,18 +30,25 @@ let rec substitute (subst:Substitution) term : Term =
   // replacement specified by 'subst.[var]' with the replacement.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
-  failwith "not implemented"
+  //failwith "not implemented"
+  match term with
+  | Atom _ -> term
+  | Variable v -> Map.tryFind v subst |> Option.defaultValue term
+  | Predicate(p, args) -> Predicate(p, List.map (substitute subst) args)
+
 
 
 let substituteSubst (newSubst:Substitution) (subst:Substitution) = 
   // TODO: Apply the substitution 'newSubst' to all the terms 
   // in the existing substitiution 'subst' (Hint: use Map.map).
-  failwith "not implemented"
+  // failwith "not implemented"
+  Map.map (fun var term -> substitute newSubst term) subst
 
 
 let substituteTerms (subst:Substitution) (terms:list<Term>) = 
   // TODO: Apply substitution 'subst' to all the terms in 'terms'
-  failwith "not implemented"
+  // failwith "not implemented"
+  List.map (substitute subst) terms
 
 
 let rec unifyLists l1 l2 = 
@@ -53,10 +60,26 @@ let rec unifyLists l1 l2 =
   //
   // (1) The substitution 's1' is aplied to 't1' and 't2' before calling 'unifyLists'
   // (2) The substitution 's2' is applied to all terms in substitution 's1' before returning
-  failwith "implemented in step 1"
+  // failwith "implemented in step 1"
+  match l1, l2 with 
+  | [], [] -> Some(Map.empty)
+  | h1::t1, h2::t2 -> 
+      match unify h1 h2 with
+      | Some sub1 ->
+          let t1' = substituteTerms sub1 t1
+          let t2' = substituteTerms sub1 t2
+          match unifyLists t1' t2' with
+          | Some sub2 -> Some(appendSubstitutions (substituteSubst sub2 sub1) sub2)
+          | None -> None
+      | None -> None
+  | _ -> None
 
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+    match t1, t2 with
+    | Atom a1, Atom a2 when a1 = a2 -> Some(Map.empty)
+    | Predicate(p1, args1), Predicate(p2, args2) when p1 = p2 -> unifyLists args1 args2
+    | Variable v, term | term, Variable v -> Some(Map.ofList [(v, term)])
+    | _ -> None
 
 // ----------------------------------------------------------------------------
 // Advanced unification tests requiring correct substitution
